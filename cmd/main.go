@@ -1,16 +1,35 @@
 package main
 
 import (
-	"fmt"
+	"log"
+	"os"
 
+	"github.com/PrinceDavis/hex/internal/adapters/app/api"
 	"github.com/PrinceDavis/hex/internal/adapters/core/arithmetic"
+	gRPC "github.com/PrinceDavis/hex/internal/adapters/framework/left/grpc"
+	"github.com/PrinceDavis/hex/internal/adapters/framework/right/db"
+	"github.com/PrinceDavis/hex/internal/ports"
 )
 
 func main() {
-	arithAdapter := arithmetic.NewAdapter()
-	sum, err := arithAdapter.Addition(1, 2)
+	var err error
+
+	var dbaseAdapter ports.DBPort
+	var core ports.ArithmeticPort
+	var appAdapter ports.APIPort
+	var gRPCAdapter ports.GRPCPort
+
+	dbaseDriver := os.Getenv("DB_DRIVER")
+	dsource := os.Getenv("DS_NAME")
+
+	dbaseAdapter, err = db.NewAdapter(dbaseDriver, dsource)
 	if err != nil {
-		panic(err)
+		log.Fatalf("failed to initiate dbase connection %v", err)
 	}
-	fmt.Println(sum)
+	defer dbaseAdapter.CloseDBConnection()
+
+	core = arithmetic.NewAdapter()
+	appAdapter = api.NewAdapter(core, dbaseAdapter)
+	gRPCAdapter = gRPC.NewAdapter(appAdapter)
+	gRPCAdapter.Run()
 }
